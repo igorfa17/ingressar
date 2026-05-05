@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String               @id @default(uuid())
+  email                String               @unique
+  password_hash        String
+  full_name            String?
+  avatar_url           String?
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+  createdEvents        Event[]              @relation("CreatedEvents")
+  createdOrganizations Organization[]       @relation("CreatedOrganizations")
+  memberships          OrganizationMember[]
+  registrations        Registration[]
+}
+
+model Organization {
+  id            String               @id @default(uuid())
+  name          String
+  slug          String               @unique
+  created_by    String
+  created_at    DateTime             @default(now())
+  updated_at    DateTime             @updatedAt
+  events        Event[]
+  createdBy     User                 @relation("CreatedOrganizations", fields: [created_by], references: [id])
+  members       OrganizationMember[]
+  payments      Payment[]
+  registrations Registration[]
+  tickets       TicketTier[]
+}
+
+model OrganizationMember {
+  id              String       @id @default(uuid())
+  organization_id String
+  user_id         String
+  role            OrgRole
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, user_id])
+}
+
+model Event {
+  id              String         @id @default(uuid())
+  organization_id String
+  created_by      String
+  title           String
+  slug            String         @unique
+  description     String?
+  starts_at       DateTime
+  ends_at         DateTime
+  status          EventStatus    @default(DRAFT)
+  createdBy       User           @relation("CreatedEvents", fields: [created_by], references: [id])
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+  registrations   Registration[]
+  ticket_tiers    TicketTier[]
+}
+
+model TicketTier {
+  id              String         @id @default(uuid())
+  event_id        String
+  organization_id String
+  name            String
+  price_cents     Int
+  registrations   Registration[]
+  event           Event          @relation(fields: [event_id], references: [id])
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+}
+
+model Registration {
+  id                String             @id @default(uuid())
+  organization_id   String
+  event_id          String
+  ticket_tier_id    String
+  user_id           String?
+  participant_name  String
+  participant_email String
+  status            RegistrationStatus @default(PENDING)
+  payments          Payment[]
+  event             Event              @relation(fields: [event_id], references: [id])
+  organization      Organization       @relation(fields: [organization_id], references: [id])
+  ticket_tier       TicketTier         @relation(fields: [ticket_tier_id], references: [id])
+  user              User?              @relation(fields: [user_id], references: [id])
+}
+
+model Payment {
+  id              String       @id @default(uuid())
+  registration_id String
+  organization_id String
+  amount_cents    Int
+  fee_cents       Int
+  status          String
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  registration    Registration @relation(fields: [registration_id], references: [id])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ENDED
+  CANCELLED
+}
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
